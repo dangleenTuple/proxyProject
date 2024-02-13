@@ -64,8 +64,11 @@ void handle_client_connection(int client_socket_fd, char *reverseProxy_host, cha
     char buffer[BUFFER_SIZE];
     int bytes_read;
     bytes_read = read(client_socket_fd, buffer, BUFFER_SIZE);
+    //Now that we have the headers, we don't need anything else from the client.
+    //Write what we have to our reverse proxy
     write(reverseProxy_socket_fd, buffer, bytes_read);
 
+    //In the backend/proxy server, we will read the headers and then write them back into our client socket
     while (bytes_read = read(reverseProxy_socket_fd, buffer, BUFFER_SIZE)) {
         write(client_socket_fd, buffer, bytes_read);
     }
@@ -161,7 +164,7 @@ int main(int argc, char *argv[]) {
             perror("Could not accept");
             exit(1);
         }
-        //Pass the fd of the connection that was successful into our func
+        //Pass the fd of the connection that was successful into our proxy func
         handle_client_connection(client_socket_fd, reverseProxy_addr, reverseProxy_port_str);
 
     }
