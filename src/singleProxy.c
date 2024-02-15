@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
 #include <netdb.h>
 
 #define MAX_LISTEN_BACKLOG 1 //how many connections we are allowing at a time
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
     char *reverseProxy_addr;
     char *reverseProxy_port_str;
     if (argc != 4) {
-        fprintf(stderr, "Usage: %s   \n", argv[0]);
+        fprintf(stderr, "Usage: %s <server_port> <backend_addr> <backend_port>\n", argv[0]);
         exit(1);
     }
     server_port_str = argv[1];
@@ -154,6 +154,7 @@ int main(int argc, char *argv[]) {
     //mark the socket so that it's "passive"
     //Meaning, it will listen for incoming connections instead of making outgoing connections
     listen(server_socket_fd, MAX_LISTEN_BACKLOG);
+    printf("Started.  Listening on port %s.\n", server_port_str);
 
     //Proxy time!
     while (1) {
