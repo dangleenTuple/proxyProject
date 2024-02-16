@@ -9,22 +9,25 @@
 #define MAX_LISTEN_BACKLOG 1 //how many connections we are allowing at a time
 #define BUFFER_SIZE 4096
 
+//Networking NOTE: the host as mentioned below is like a house on a street. The "street" is the network/internet address.
+//Your device/host that will provide the service (our server) is a house on a street of many houses.
 void handle_client_connection(int client_socket_fd, char *reverseProxy_host, char *reverseProxy_port_str)
 {
-    struct addrinfo services;
+    printf("\nHANDLING THE CLIENT\n");
+    struct addrinfo hints;
 
-    //set up our services struct. We only want to read and write to files, no datagrams (packets of data) are intended to be created/used
-    memset(&services, 0, sizeof(struct addrinfo));
-    services.ai_family = AF_UNSPEC; //could be IPv4 or IPv6
-    services.ai_socktype = SOCK_STREAM; //we want to expect streaming sockets specifically
+    //set up our hints struct. We only want to read and write to files, no datagrams (packets of data) are intended to be created/used
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC; //could be IPv4 or IPv6
+    hints.ai_socktype = SOCK_STREAM; //we want to expect streaming sockets specifically
 
     struct addrinfo *addrs;
     int getaddrinfo_error;
 
     //Let's get an internet address we can bind/connect to
-    getaddrinfo_error = getaddrinfo(reverseProxy_host, reverseProxy_port_str, &services, &addrs);
+    getaddrinfo_error = getaddrinfo(reverseProxy_host, reverseProxy_port_str, &hints, &addrs);
     if (getaddrinfo_error != 0) {
-        fprintf(stderr, "Couldn't find reverse proxy: %s\n", gai_strerror(getaddrinfo_error));
+        fprintf(stderr, "Couldn't find an internet address for the reverse proxy: %s\n", gai_strerror(getaddrinfo_error));
         exit(1);
     }
 
@@ -39,9 +42,11 @@ void handle_client_connection(int client_socket_fd, char *reverseProxy_host, cha
         if (reverseProxy_socket_fd == -1) {
             continue;
         }
-
+         printf("SOCKET SUCCESS \n");
+         
         //Now that we have a socket, let's try to connect! If this is successful, we are done here.
         if (connect(reverseProxy_socket_fd, addrs_iter->ai_addr, addrs_iter->ai_addrlen) != -1) { 
+            printf("CONNECT SUCCESS \n");
             break;
         }
 
@@ -51,7 +56,7 @@ void handle_client_connection(int client_socket_fd, char *reverseProxy_host, cha
     
     //If addres_iter is still NULL, that means we couldn't make a connection at all.
     if (addrs_iter == NULL) {
-        fprintf(stderr, "Couldn't connect to reverse proxy");
+        fprintf(stderr, "Couldn't establish a connection for the reverse proxy\n");
         exit(1);
     }
 
@@ -81,7 +86,6 @@ void handle_client_connection(int client_socket_fd, char *reverseProxy_host, cha
 //bind() is used for defining the communication endpoint (sending data to and from that endpoint).
 //When the server side binds, clients can use that address to connect to the server.
 //Bind/connect are specific relationships that are important to differentiate
-
 int main(int argc, char *argv[]) {
     //Check for arguments on the command line then store them
     char *server_port_str;
@@ -95,23 +99,23 @@ int main(int argc, char *argv[]) {
     reverseProxy_addr = argv[2];
     reverseProxy_port_str = argv[3];
 
-    //Create an addrinfo struct for the localhost
-    struct addrinfo localhost;
-    memset(&localhost, 0, sizeof(struct addrinfo));
-    localhost.ai_family = AF_UNSPEC;
-    localhost.ai_socktype = SOCK_STREAM;
+    //Create an addrinfo struct for the hints
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
 
     //Linux manpage for gettaddrinfo(2):
     //If the AI_PASSIVE flag is specified in hints.ai_flags, and node is NULL, 
     //then the returned socket addresses will be suitable for bind(2)ing a socket 
     //that will accept(2) connections. The returned socket address will contain
     //the "wildcard address" [...]. If node is not NULL, then the AI_PASSIVE flag is ignored.
-    localhost.ai_flags = AI_PASSIVE;
+    hints.ai_flags = AI_PASSIVE;
 
-    //Do the same getaddrinfo call for the localhost
+    //Do the same getaddrinfo call for the hints
     struct addrinfo *addrs;
     int getaddrinfo_error;
-    getaddrinfo_error = getaddrinfo(NULL, server_port_str, &localhost, &addrs);
+    getaddrinfo_error = getaddrinfo(NULL, server_port_str, &hints, &addrs);
 
     //Now instead of trying to connect to them to make an outgoing connection, 
     //we try to bind so that we can accept incoming connections:

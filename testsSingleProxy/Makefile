@@ -11,4 +11,4 @@ cleanTests:
 	$(CC) -c $<
 
 singleProxyTest: $(OBJ_FILES)
-	$(CC) -o $@ $(OBJ_FILES)
+	$(CC) -o $@ $(OBJ_FILES) -lboost_system -lboost_thread
