@@ -7,6 +7,7 @@
 #include <thread>
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/address.hpp>
+#include <boost/array.hpp>
 
 using namespace std;
 using tcp = boost::asio::ip::tcp;
@@ -31,8 +32,8 @@ int startMainServer() {
        // Below let's pass in the needed parameters: the path, what gets passed in as the main argv[0], then argv[1-3]...
 
        //   exec        argv[0], argv[1]=server_port_str, argv[2]=reverseProxy_addr, argv[3]=reverseProxy_port_str
-       cout << "Inside child process of test, let's run our main server: " << endl;
-       execl(executable, executable, "8000", "127.0.0.1", "8888", (char*)0);
+       cout << "Inside child process of test, let's run our main server!" << endl;
+       execl(executable, executable, "56000", "127.0.0.1", "55000", (char*)0);
 
        /* exec does not return unless the program couldn't be started. 
           If we made it to this point, that means something went wrong.
@@ -89,11 +90,12 @@ void clientServer(){
     // we need a socket and a resolver
     tcp::socket client(io_context);
     tcp::resolver resolver(io_context);
-
+    cout << "[Client] Waiting for connection" << endl;
     //while (true)
     //{
         // now we can use connect(..)
-        boost::asio::connect(client, resolver.resolve( tcp::resolver::query("localhost","8000",tcp::resolver::query::canonical_name)));
+    client.connect( tcp::endpoint( boost::asio::ip::address::from_string("127.0.0.1"), 56000));
+    cout << "[Client Server] Made a connection" << endl;
        /*const int BUFLEN = 1024;
         vector<char> buf(BUFLEN);
         client.send(buffer(HTTP_REQUEST, HTTP_REQUEST.size()));
@@ -107,36 +109,44 @@ void clientServer(){
     //}
 
      // and use write(..) to send some data which is here just a string
-   /* std::string data{"some client data ..."};
-    auto result = boost::asio::write(socket, boost::asio::buffer(data));
+    /*std::string data{"some client data ..."};
+    auto result = boost::asio::write(client, boost::asio::buffer(data));
     
     // the result represents the size of the sent data
-    std::cout << "data sent: " << data.length() << '/' << result << std::endl;
-
-    // and close the connection now
+    cout << "DATA SENT FROM CLIENT: " << data.length() << '/' << result << endl;*/
+    boost::asio::streambuf sb;
     boost::system::error_code ec;
-    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
-    socket.close();*/
+    while (boost::asio::read(client, sb, ec)){
+        std::cout << "received: '" << &sb << "'\n";
+
+        if (ec) {
+            std::cout << "status: " << ec.message() << "\n";
+            break;
+        }
+    }
+    // and close the connection now
+    //boost::system::error_code ec;
+    //client.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+    //client.close();
 }
 
 void SendHandler(boost::system::error_code ex){
-    cout << "MADE IT TO HANDLER" << endl;
+    cout << "Hello from backend!" << endl;
 }
 
 void proxyServer(){
     boost::asio::io_service service;
     using namespace boost::asio::ip;
-    tcp::endpoint endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 8888);
+    tcp::endpoint endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 55000);
     tcp::acceptor acceptor(service, endpoint); 
     tcp::socket socket(service);
-    cout << "[Server] Waiting for connection" << endl;
+    cout << "[Proxy Server] Waiting for connection" << endl;
 
     acceptor.accept(socket);
-    cout << "[Server] Accepted a connection from client" << endl;
-
-    std::string msg = "You made it to the proxy server!";
-    socket.async_send(boost::asio::buffer(msg), SendHandler);
-    service.run();
+    cout << "[Proxy Server] Accepted a connection" << endl;
+    string const& message = "Hi from the proxy!\nWhat would you like to send to the main server?\n";
+    socket.send(boost::asio::buffer(message));
+    //service.run();
 }
 
 
@@ -144,12 +154,12 @@ int main() {
 
     cout << "STARTING MAIN SERVER" << endl;
     //cout << "STATUS: " << startMainServer() << endl;
-    boost::thread s(&startMainServer);
-    boost::thread c(&clientServer);
     boost::thread p(&proxyServer);
-    c.join();
+    //boost::thread s(&startMainServer);
+    boost::thread c(&clientServer);
     p.join();
-    s.join();
+    c.join();
+    //s.join();
 
     return 0;
 }
@@ -175,16 +185,16 @@ class TestCanProxyHTTPRequestToBackend(unittest.TestCase):
         server_thread.start()
 
         # ...and an rsp option that proxies everything to it.
-        server = pexpect.spawn(RSP_BINARY, ["8000", "127.0.0.1", "8888"])
-        server.expect("Started.  Listening on port 8000.")
+        server = pexpect.spawn(RSP_BINARY, ["8080", "127.0.0.1", "8888"])
+        server.expect("Started.  Listening on port 8080.")
         try:
             # Make a request and check it works.
-            response = requests.get("http://127.0.0.1:8000")
+            response = requests.get("http://127.0.0.1:8080")
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.text, "Hello from the mock server\n")
 
             # Make a second request and check it works too.
-            response = requests.get("http://127.0.0.1:8000")
+            response = requests.get("http://127.0.0.1:8080")
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.text, "Hello from the mock server\n")
         finally:

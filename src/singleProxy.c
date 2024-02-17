@@ -69,6 +69,8 @@ void handle_client_connection(int client_socket_fd, char *reverseProxy_host, cha
     char buffer[BUFFER_SIZE];
     int bytes_read;
     bytes_read = read(client_socket_fd, buffer, BUFFER_SIZE);
+
+    printf("\nBYTES RECEIVED FROM CLIENT: %d\n", bytes_read);
     //Now that we have the headers, we don't need anything else from the client.
     //Write what we have to our reverse proxy
     write(reverseProxy_socket_fd, buffer, bytes_read);
@@ -132,8 +134,8 @@ int main(int argc, char *argv[]) {
         //Because we are initializing our server socket in the the main loop, the only way it gets closed
         //is if the OS times it out. This could mean restarting our program may take a long time.
         //Let's set the socket option to SO_REUSEADDR which 
-        setsockopt(server_socket_fd, SOL_SOCKET, SO_REUSEADDR, &so_reuseaddr, sizeof(so_reuseaddr));
-        if (bind(server_socket_fd, addr_iter->ai_addr, addr_iter->ai_addrlen) == 0) 
+        setsockopt(server_socket_fd, SOL_SOCKET, SO_LINGER, &so_reuseaddr, sizeof(so_reuseaddr));
+        if (bind(server_socket_fd, addr_iter->ai_addr, addr_iter->ai_addrlen) != -1) 
         {
             break;
         }
@@ -146,7 +148,6 @@ int main(int argc, char *argv[]) {
 
         close(server_socket_fd);
     }
-
     //Cleanup!
     if (addr_iter == NULL) {
         fprintf(stderr, "Couldn't bind\n");
