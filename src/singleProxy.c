@@ -13,7 +13,6 @@
 //Your device/host that will provide the service (our server) is a house on a street of many houses.
 void handle_client_connection(int client_socket_fd, char *reverseProxy_host, char *reverseProxy_port_str)
 {
-    printf("\nHANDLING THE CLIENT\n");
     struct addrinfo hints;
 
     //set up our hints struct. We only want to read and write to files, no datagrams (packets of data) are intended to be created/used
@@ -24,7 +23,7 @@ void handle_client_connection(int client_socket_fd, char *reverseProxy_host, cha
     struct addrinfo *addrs;
     int getaddrinfo_error;
 
-    //Let's get an internet address we can bind/connect to
+    //Let's get an internet address we can connect to
     getaddrinfo_error = getaddrinfo(reverseProxy_host, reverseProxy_port_str, &hints, &addrs);
     if (getaddrinfo_error != 0) {
         fprintf(stderr, "Couldn't find an internet address for the reverse proxy: %s\n", gai_strerror(getaddrinfo_error));
@@ -42,11 +41,8 @@ void handle_client_connection(int client_socket_fd, char *reverseProxy_host, cha
         if (reverseProxy_socket_fd == -1) {
             continue;
         }
-         printf("SOCKET SUCCESS \n");
-         
         //Now that we have a socket, let's try to connect! If this is successful, we are done here.
         if (connect(reverseProxy_socket_fd, addrs_iter->ai_addr, addrs_iter->ai_addrlen) != -1) { 
-            printf("CONNECT SUCCESS \n");
             break;
         }
 
@@ -70,7 +66,7 @@ void handle_client_connection(int client_socket_fd, char *reverseProxy_host, cha
     int bytes_read;
     bytes_read = read(client_socket_fd, buffer, BUFFER_SIZE);
 
-    printf("\nBYTES RECEIVED FROM CLIENT: %d\n", bytes_read);
+    printf("\nPROXY RECEIVED %d BYTES.\n", bytes_read);
     //Now that we have the headers, we don't need anything else from the client.
     //Write what we have to our reverse proxy
     write(reverseProxy_socket_fd, buffer, bytes_read);
@@ -134,7 +130,7 @@ int main(int argc, char *argv[]) {
         //Because we are initializing our server socket in the the main loop, the only way it gets closed
         //is if the OS times it out. This could mean restarting our program may take a long time.
         //Let's set the socket option to SO_REUSEADDR which 
-        setsockopt(server_socket_fd, SOL_SOCKET, SO_LINGER, &so_reuseaddr, sizeof(so_reuseaddr));
+        setsockopt(server_socket_fd, SOL_SOCKET, SO_REUSEADDR, &so_reuseaddr, sizeof(so_reuseaddr));
         if (bind(server_socket_fd, addr_iter->ai_addr, addr_iter->ai_addrlen) != -1) 
         {
             break;
@@ -150,9 +146,11 @@ int main(int argc, char *argv[]) {
     }
     //Cleanup!
     if (addr_iter == NULL) {
+        //NOTE: if this happens, call "ps" and see if there is a singleProxy process running. Kill it then try again :)
         fprintf(stderr, "Couldn't bind\n");
         exit(1);
-    }
+    }else
+        printf("BIND SUCCESSFUL\n");
 
     freeaddrinfo(addrs);
 
