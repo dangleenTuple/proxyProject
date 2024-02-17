@@ -33,7 +33,7 @@ int startMainServer() {
 
        //   exec        argv[0], argv[1]=server_port_str, argv[2]=reverseProxy_addr, argv[3]=reverseProxy_port_str
        cout << "Inside child process of test, let's run our main server!" << endl;
-       execl(executable, executable, "55005", "127.0.0.1", "56000", (char*)0);
+       execl(executable, executable, "55005", "127.0.0.1", "56000", (char*)0); //NOTE: Try to use ports that are dynamic (49152 to 65535) since they are meant for client programs like this one
 
        /* exec does not return unless the program couldn't be started. 
           If we made it to this point, that means something went wrong.
