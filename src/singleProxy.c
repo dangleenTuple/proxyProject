@@ -66,18 +66,15 @@ void handle_client_connection(int client_socket_fd, char *reverseProxy_host, cha
     int bytes_read;
     bytes_read = read(client_socket_fd, buffer, BUFFER_SIZE);
 
-    printf("\nPROXY RECEIVED %d BYTES.\n", bytes_read);
+    printf("\nPROXY RECEIVED %d BYTES.\n\n", bytes_read);
     //Now that we have the headers, we don't need anything else from the client.
     //Write what we have to our reverse proxy
     write(reverseProxy_socket_fd, buffer, bytes_read);
 
     //In the backend/proxy server, we will read the headers and then write them back into our client socket
     while (bytes_read = read(reverseProxy_socket_fd, buffer, BUFFER_SIZE)) {
-        write(client_socket_fd, buffer, bytes_read);
+        write(client_socket_fd, buffer, bytes_read); //I'm not sure if this actually works?
     }
-
-    close(client_socket_fd);
-
 }
 
 //In this example, we must bind() to associate the socket with its local address.
@@ -170,7 +167,8 @@ int main(int argc, char *argv[]) {
         }
         //Pass the fd of the connection that was successful into our proxy func
         handle_client_connection(client_socket_fd, reverseProxy_addr, reverseProxy_port_str);
-
+        char buffer[43] = "Completed transmission! Time to shut down.";
+        write(client_socket_fd, buffer, 43);
     }
 
 }

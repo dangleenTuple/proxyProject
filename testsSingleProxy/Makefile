@@ -1,4 +1,4 @@
-CC=g++
+CC=g++ -std=c++20
 OBJ_FILES := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 
 all: singleProxyTest

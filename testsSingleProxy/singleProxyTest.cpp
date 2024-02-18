@@ -8,6 +8,7 @@
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/address.hpp>
 #include <boost/array.hpp>
+#include <condition_variable>
 
 using namespace std;
 using tcp = boost::asio::ip::tcp;
@@ -16,6 +17,9 @@ using boost::asio::ip::tcp;
 using boost::asio::ip::address;
 using boost::asio::io_service;
 using boost::asio::buffer;
+
+condition_variable cv;
+mutex m;
 
 //Let's write a function that will start a process that runs our C program
 int startMainServer() {
@@ -54,21 +58,28 @@ void clientServer(){
     // we need a socket and a resolver
     tcp::socket client(io_context);
     tcp::resolver resolver(io_context);
+
     cout << "[Client] Waiting for connection" << endl;
-    //while (true)
-    //{
-        // now we can use connect(..)
     client.connect( tcp::endpoint( boost::asio::ip::address::from_string("127.0.0.1"), 55005));
-    cout << "[Client Server] Made a connection" << endl;
-    string const& message = "Hi from the Client!";
+    cout << "[Client] Made a connection" << endl;
+
+    string message = "Hi from the Client!";
     client.send(boost::asio::buffer(message));
+    cout << "CLIENT SENT MESSAGE" << endl;
 
-    boost::asio::streambuf sb;
+    //Utilizing a lock here to make the print statements make sense. Otherwise, it will read out of order since the send/recvs might happen at different times for the proxy and client.
+    unique_lock<decltype(m)> l(m);
+    cv.wait(l);
+    cout << "READING RESULTING BUFFER IN CLIENT: " << endl;
+    //NOTE: Keep in mind, the singleProxy.c code is designed to take in only one message. 
+    //Because it only will relay to the proxy once from the main server.
+    boost::array<char, 43> buf;
+    client.receive(boost::asio::buffer(buf));
+    for(char c : buf)
+        cout << c;
+    cout << endl;
     boost::system::error_code ec;
-    while (boost::asio::read(client, sb, ec)) //This is not printing? Idk why :(
-        std::cout  << &sb << "\n";
-
-    cout << "CLOSING DOWN CLIENT" << endl;
+    cout << "CLOSING DOWN CLIENT\n\n" << endl;
     client.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
     client.close();
 }
@@ -80,10 +91,23 @@ void proxyServer(){
     tcp::endpoint endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 56000);
     tcp::acceptor acceptor(service, endpoint); 
     tcp::socket socket(service);
-    cout << "[Proxy Server] Waiting for connection" << endl;
+    cout << "[Proxy] Waiting for connection" << endl;
     acceptor.accept(socket);
-    cout << "[Proxy Server] Accepted a connection" << endl;
-    service.run(); //This should stop this thread after finishing up all of the services for io_service
+    cout << "[Proxy] Accepted a connection" << endl;
+
+    boost::array<char, 21> buf;
+    boost::system::error_code ec;
+    cout << "READING RESULTING BUFFER IN PROXY: " << endl;
+    socket.receive(boost::asio::buffer(buf));
+    for(char c : buf)
+        cout << c;
+    cout << endl;
+    cv.notify_all();
+    //unique_lock<decltype(m)> l(m);
+    //cv.wait(l);
+    cout << "CLOSING DOWN PROXY\n\n" << endl;
+    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+    socket.close();
 }
 
 
@@ -94,8 +118,8 @@ int main() {
     sleep(5); //For some reason, the "bind()" takes a long time to fully execute. As a temp solution, let's make the other threads wait a bit.
     boost::thread p(&proxyServer);
     boost::thread c(&clientServer);
-    c.join();
     p.join();
-    s.detach(); //The other threads will end on its own once we send a message. Let's gracefully shut this one down.
+    c.join(); //We have to join the client and proxy (it doesn't matter the order) first to make sure that these are completely done with their transmissions before we attempt to shut down the main thread.
+    s.detach(); //The other threads will end on their own once we send a message. Let's stop the main server thread, otherwise it will hang.
     return 0;
 }
