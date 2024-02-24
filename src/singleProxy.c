@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <sys/epoll.h>
 
-#define MAX_LISTEN_BACKLOG 1 //how many connections we are allowing at a time
+#define MAX_LISTEN_BACKLOG 4096 //how many connections we are allowing at a time
 #define BUFFER_SIZE 4096
 
 typedef union epoll_data {
@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
     char *reverseProxy_addr;
     char *reverseProxy_port_str;
     if (argc != 4) {
-        fprintf(stderr, "Usage: %s <server_port> <backend_addr> <backend_port>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <server_port> <reverseProxy_addr> <reverseProxy_port>\n", argv[0]);
         exit(1);
     }
     server_port_str = argv[1];
@@ -42,8 +42,5 @@ int main(int argc, char *argv[]) {
     add_epoll_handler(epoll_fd, server_socket_event_handler, EPOLLIN);
     printf("Started.  Listening on port %s.\n", server_port_str);
     do_epoll_wait(epoll_fd);
-
-    make_socket_non_blocking(server_socket_fd);
-
     return 0;
 }
