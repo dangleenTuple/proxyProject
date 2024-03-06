@@ -8,4 +8,4 @@ struct epoll_event_handler {
 
 extern void add_epoll_handler(int epoll_fd, struct epoll_event_handler* handler, uint32_t event_mask);
 
-extern void do_reactor_loop(int epoll_fd);
+extern void do_epoll_wait(int epoll_fd);

@@ -11,8 +11,9 @@
 #include "server_socket.h"
 #include "client_socket.h"
 
-#define MAX_LISTEN_BACKLOG 4096
+#define MAX_LISTEN_BACKLOG 10
 
+void handle_client_connection(int epoll_fd, int client_socket_fd, char* reverseProxy_host, char* reverseProxy_port_str);
 
 struct server_socket_event_data {
     int epoll_fd;

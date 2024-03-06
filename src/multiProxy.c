@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <sys/epoll.h>
 
+#include "epollinterface.h"
+#include "server_socket.h"
+
 #define MAX_LISTEN_BACKLOG 4096 //how many connections we are allowing at a time
 #define BUFFER_SIZE 4096
 
@@ -24,8 +27,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    struct epoll_event_handler* server_socket_event_handler;
-    server_socket_event_handler = create_server_socket_handler(epoll_fd, server_port_str, reverseProxy_addr, reverseProxy_port_str);
+    struct epoll_event_handler* server_socket_event_handler  = create_server_socket_handler(epoll_fd, server_port_str, reverseProxy_addr, reverseProxy_port_str);
     add_epoll_handler(epoll_fd, server_socket_event_handler, EPOLLIN);
     printf("Started.  Listening on port %s.\n", server_port_str);
     do_epoll_wait(epoll_fd);

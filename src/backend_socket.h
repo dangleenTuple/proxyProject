@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 extern void handle_backend_socket_event(struct epoll_event_handler* self, uint32_t events);
 

@@ -27,7 +27,7 @@ void do_epoll_wait(int epoll_fd)
         struct epoll_event_handler* handler;
         //What this does is ask for one event (1), with no timeout (-1)
         //You could pass in an array and ask for a max number of events instead of just putting one.
-        //However, in the scenario that one of the client connections close before we get to the even in the array, it would render this event useless
+        //However, in the scenario that one of the client connections close before we even get to it in the epoll data structure, it would render this event useless
         //and even cause the server to crash.
         //There is more than one solution to this problem, but for now, we can simply just block for only one event at a time.
         epoll_wait(epoll_fd, &current_epoll_event, 1, -1);
