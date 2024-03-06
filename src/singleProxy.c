@@ -5,19 +5,6 @@
 #define MAX_LISTEN_BACKLOG 4096 //how many connections we are allowing at a time
 #define BUFFER_SIZE 4096
 
-typedef union epoll_data {
-    void    *ptr;
-    int      fd;
-    uint32_t u32;
-    uint64_t u64;
-} epoll_data_t;
-
-struct epoll_event_handler {
-    int fd;
-    void (*handle)(struct epoll_event_handler*, uint32_t);
-    void* closure;
-};
-
 int main(int argc, char *argv[]) {
     //Check for arguments on the command line then store them
     char *server_port_str;
