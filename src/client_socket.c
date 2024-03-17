@@ -1,12 +1,14 @@
+#include <unistd.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/epoll.h>
 #include <errno.h>
+#include <sys/epoll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <string.h>
+
 
 #include "netutils.h"
 #include "epollinterface.h"
@@ -75,17 +77,18 @@ struct epoll_event_handler* connect_to_backend(struct epoll_event_handler* clien
 }
 
 
-
+//This function gets called when the server accepts the connection to the client. Then it uses this handler to handle this event.
 struct epoll_event_handler* create_client_socket_handler(int client_socket_fd, int epoll_fd, char* backend_host, char* backend_port_str)
 {
     make_socket_non_blocking(client_socket_fd);
     struct client_socket_event_data* closure = malloc(sizeof(struct client_socket_event_data));
-    struct epoll_event_handler* result =  &(struct epoll_event_handler) {
-        .fd = client_socket_fd,
-        .handle = handle_client_socket_event,
-        .closure = closure,
-    };
 
+    struct epoll_event_handler* result = malloc(sizeof(struct epoll_event_handler));
+    result->fd = client_socket_fd;
+    result->handle = handle_client_socket_event;
+    result->closure = closure;
+
+    //We will find a connection for the backend that we want for this client then add this backend event to the epoll instance
     closure->backend_handler = connect_to_backend(result, epoll_fd, backend_host, backend_port_str);
     return result;
 }
@@ -93,6 +96,7 @@ struct epoll_event_handler* create_client_socket_handler(int client_socket_fd, i
 
 void handle_client_socket_event(struct epoll_event_handler* self, uint32_t events)
 {
+    printf("Handling client event\n");
     struct client_socket_event_data* closure = (struct client_socket_event_data* ) self->closure;
 
     char buffer[BUFFER_SIZE];

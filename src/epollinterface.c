@@ -4,6 +4,7 @@
 #include <sys/epoll.h>
 
 #include "epollinterface.h"
+#include "server_socket.h"
 
 #define MAX_EPOLL_EVENTS 10
 
@@ -14,7 +15,7 @@ void add_epoll_handler(int epoll_fd, struct epoll_event_handler* handler, uint32
     event.data.ptr = handler;
     event.events = event_mask;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, handler->fd, &event) == -1) {
-        perror("Couldn't register server socket with epoll");
+        perror("Couldn't register with epoll");
         exit(-1);
     }
 }
@@ -30,9 +31,16 @@ void do_epoll_wait(int epoll_fd)
         //However, in the scenario that one of the client connections close before we even get to it in the epoll data structure, it would render this event useless
         //and even cause the server to crash.
         //There is more than one solution to this problem, but for now, we can simply just block for only one event at a time.
-        epoll_wait(epoll_fd, &current_epoll_event, 1, -1);
+
+        int res = epoll_wait(epoll_fd, &current_epoll_event, 1, -1);
+        if(res == -1)
+        {
+            perror("Error retrieving events in epoll instance\n");
+            exit(1);
+        }
         handler = (struct epoll_event_handler*) current_epoll_event.data.ptr;
         handler->handle(handler, current_epoll_event.events);
+        printf("DONE HANDLING EVENT\n");
     }
 
 }

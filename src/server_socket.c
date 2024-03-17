@@ -66,12 +66,14 @@ int create_and_bind(char* server_port_str)
     return server_socket_fd;
 }
 
+//We will accept all incoming client connections and then create a client handler event per successful connection
 void handle_server_socket_event(struct epoll_event_handler* self, uint32_t events)
 {
     struct server_socket_event_data* closure = (struct server_socket_event_data*) self->closure;
 
     int client_socket_fd;
     while (1) {
+        //Now, let's ask the listening socket we created to accept an incoming connection
         client_socket_fd = accept(self->fd, NULL, NULL);
         if (client_socket_fd == -1) {
             //EAGAIN: Resource is temporarily not available. Try again.
@@ -85,7 +87,7 @@ void handle_server_socket_event(struct epoll_event_handler* self, uint32_t event
                 exit(1);
             }
         }
-
+        //client handler instance
         handle_client_connection(closure->epoll_fd, client_socket_fd, closure->reverseProxy_addr, closure->reverseProxy_port_str);
     }
 }
@@ -93,27 +95,29 @@ void handle_server_socket_event(struct epoll_event_handler* self, uint32_t event
 struct epoll_event_handler* create_server_socket_handler(int epoll_fd, char* server_port_str, char* reverseProxy_addr, char* reverseProxy_port_str)
 {
     int server_socket_fd;
+    //Let's create and bind our main server socket
     server_socket_fd = create_and_bind(server_port_str);
     make_socket_non_blocking(server_socket_fd);
     listen(server_socket_fd, MAX_LISTEN_BACKLOG);
-    struct server_socket_event_data* closure = &(struct server_socket_event_data) {
-        .epoll_fd = epoll_fd,
-        .reverseProxy_addr = reverseProxy_addr,
-        .reverseProxy_port_str = reverseProxy_port_str,
-    };
-    struct epoll_event_handler* result =  &(struct epoll_event_handler) {
-        .fd = server_socket_fd,
-        .handle = handle_server_socket_event,
-        .closure = closure,
-    };
 
+    struct server_socket_event_data* closure = malloc(sizeof(struct server_socket_event_data));
+    closure->epoll_fd = epoll_fd;
+    closure->reverseProxy_addr = reverseProxy_addr;
+    closure->reverseProxy_port_str = reverseProxy_port_str;
+
+    struct epoll_event_handler* result = malloc(sizeof(struct epoll_event_handler));
+    result->fd = server_socket_fd;
+    result->handle = handle_server_socket_event;
+    result->closure = closure;
     return result;
 }
 
 void handle_client_connection(int epoll_fd, int client_socket_fd, char* reverseProxy_host, char* reverseProxy_port_str)
 {
     struct epoll_event_handler* client_socket_event_handler;
+    //The below function call will add a client handler, then connect the client to a backend server (which will also have a handler added to our epoll instance)
     client_socket_event_handler = create_client_socket_handler(client_socket_fd, epoll_fd, reverseProxy_host, reverseProxy_port_str);
+
     // EPOLLRDHUP means that the client closed their connection OR only half closed their connection (only allows one-way, write-only connection. Reading is closed)
     // NOT TO BE CONFUSED WITH EPOLLHUP which means an unexpected closing of a socket happened
     // EPOLLIN gets triggered when trying to read from socket but it returns immediately instead of blocking.

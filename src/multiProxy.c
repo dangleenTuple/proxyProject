@@ -27,9 +27,14 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    //Let's init our server socket
+    //We will create a server socket instance and make it "listen"
     struct epoll_event_handler* server_socket_event_handler  = create_server_socket_handler(epoll_fd, server_port_str, reverseProxy_addr, reverseProxy_port_str);
+
+    //Let's now register this server socket to the epoll instance we are using
     add_epoll_handler(epoll_fd, server_socket_event_handler, EPOLLIN);
     printf("Started.  Listening on port %s.\n", server_port_str);
+    //Now, let's start our epoll event loop that will go on until the multiProxy process is killed
     do_epoll_wait(epoll_fd);
     return 0;
 }
