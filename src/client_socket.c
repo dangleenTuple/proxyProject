@@ -96,7 +96,6 @@ struct epoll_event_handler* create_client_socket_handler(int client_socket_fd, i
 
 void handle_client_socket_event(struct epoll_event_handler* self, uint32_t events)
 {
-    printf("Handling client event\n");
     struct client_socket_event_data* closure = (struct client_socket_event_data* ) self->closure;
 
     char buffer[BUFFER_SIZE];
@@ -112,14 +111,24 @@ void handle_client_socket_event(struct epoll_event_handler* self, uint32_t event
         bytes_read = read(self->fd, buffer, BUFFER_SIZE);
         //No data received, so we just return.
         if (bytes_read == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            printf("ERROR WHILE RECEIVING RECEIVED FOR CLIENT\n");
             return;
         }
         //If we receive nothing, but there's no other indication, the remote end probably closed its connection.
         if (bytes_read == 0 || bytes_read == -1) {
+            printf("NO BYTES RECEIVED FOR CLIENT, CLOSING SOCKET\n");
             close_backend_socket(closure->backend_handler);
             close_client_socket(self);
             return;
         }
+
+        //Let's print what we received from the backend
+        printf("CLIENT SERVER RECEIVED THIS MESSAGE:\n");
+        for (int i = 0; i < bytes_read; i++)
+        {
+            printf("%c", buffer[i]);  
+        }
+        printf("\n");
 
         //Successful read! Send it to the backend
         write(closure->backend_handler->fd, buffer, bytes_read);

@@ -40,7 +40,6 @@ void do_epoll_wait(int epoll_fd)
         }
         handler = (struct epoll_event_handler*) current_epoll_event.data.ptr;
         handler->handle(handler, current_epoll_event.events);
-        printf("DONE HANDLING EVENT\n");
     }
 
 }

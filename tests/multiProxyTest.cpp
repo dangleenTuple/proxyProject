@@ -11,13 +11,11 @@
 #include <condition_variable>
 
 using namespace std;
-using tcp = boost::asio::ip::tcp;
-namespace http = boost::beast::http;
-using boost::asio::ip::tcp;
-using boost::asio::ip::address;
-using boost::asio::io_service;
-using boost::asio::buffer;
+using namespace boost::asio::ip;
 
+atomic<int> counter = 0; //This counter (a semaphore) is atomic - meaning that the counter will either be finished or unstarted (remember, to change the value of this counter, we must load, add then store its value. Three steps.). 
+    //There is no "in between" state. This is achieved by mutual exclusion.
+    //Atomic operations in C++ are performed with std::memory_order_seq_cst, which means it guarantees sequential consistency (total global ordedring).
 condition_variable cv;
 mutex m;
 
@@ -49,8 +47,9 @@ int startMultiProxy() {
    }
    return status; // this should be the parent process again if there were no issues
 }
-//TODO: pass a message so that we can confirm our proxy can connect with multiple clients at a time.
-void clientServer(string message){
+//Pass a message so that we can confirm our proxy can connect with multiple clients at a time.
+void clientServer(string message, int clientNum){
+    sleep(0); //Same reason as the other sleep(0), we want to have our print statements actually make sense when we start all of our client threads.
     boost::asio::io_service io_service;
     using boost::asio::ip::tcp;
     boost::asio::io_context io_context;
@@ -59,30 +58,40 @@ void clientServer(string message){
     tcp::socket client(io_context);
     tcp::resolver resolver(io_context);
 
-    cout << "[Client] Waiting for connection" << endl;
     client.connect( tcp::endpoint( boost::asio::ip::address::from_string("127.0.0.1"), 55005));
-    cout << "[Client] Made a connection" << endl;
+    cout << "[Client " << clientNum << "] Made a connection" << endl;
 
-    //Let's not send anything until we make a connection to the backend
-    unique_lock<decltype(m)> l(m);
-    cv.wait(l);
     client.send(boost::asio::buffer(message));
-    cout << "CLIENT SENT MESSAGE" << endl;
+    cout << "[Client " << clientNum << "] Sent a message" << endl;
 }
 
-//TODO: probably have this run in a loop or until the main server closes? Use a mutex to do this?
-void backendServer(){
-    boost::asio::io_service service;
-    using namespace boost::asio::ip;
-    tcp::endpoint endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 56000);
-    tcp::acceptor acceptor(service, endpoint); 
-    tcp::socket socket(service);
+void backendReceive(tcp::socket* backend)
+{
+    boost::array<char, 21> buf;
+    backend->receive(boost::asio::buffer(buf)); 
+    sleep(0); //Adding this here in case if client thread print statements are faster - otherwise, sometimes the print statements happen out of order.
+    //NOTE: Sleep(0) seems like it does nothing, but lowers this thread's priority by letting other threads that need to run to go first.
+    cout << "[Backend] Received this message: " << endl;
+    for(char c : buf)
+        cout << c;
+    cout << endl;
+    counter--;
+}
 
-    cout << "[Proxy] Waiting for connection" << endl;
-    acceptor.accept(socket);
-    cout << "[Proxy] Accepted a connection" << endl;
-    cv.notify_all();
-    //We handle the shutdown/closing of the backend server in the backend_socket.c program
+void backendServer(){
+    boost::asio::io_context io_context;
+    tcp::endpoint endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 56000);
+    tcp::acceptor acceptor(io_context, endpoint); 
+    acceptor.listen();
+    while(true)
+    {
+        tcp::socket backend(io_context);
+        acceptor.accept(backend);
+        counter++;
+        cout << "[Backend] Accepted a connection" << endl;
+        boost::thread s(&backendReceive, &backend);
+        s.join(); //We want to make sure our print statements actually finish to see if this is all successful. So let's ensure it by joining every backend receive thread.
+    }
 }
 
 
@@ -100,12 +109,20 @@ int main() {
 
     //To keep things simple, let's just use one backend server to test this.
     boost::thread b(&backendServer);
-    boost::thread c1(&clientServer, "Hi from first client!");
-    //boost::thread c2(&clientServer, "Hi from second client!");
+    boost::thread c1(&clientServer, "Hi from first client!", 1);
+    boost::thread c2(&clientServer, "Hi from second client!", 2);
+    boost::thread c3(&clientServer, "Hi from third client!", 3);
+    c1.join(); //NOTE: the order of these joins don't really matter.
+    c2.join();
+    c3.join();
+    sleep(5); //Let's give some time for these clients to actually connect to a backend before we actually have to lock our main thread.
 
-    c1.join();
-    //c2.join();
-    b.join();
-    s.detach(); //The other threads will end on their own once we send a message. Let's stop the main server thread, otherwise it will hang.*/
+    unique_lock<decltype(m)> l(m); //We are using this condition variable like a semaphore. The semaphore will count all of the threads that are running being processed, and when they finish they will subtract themselves from the semaphore
+    //When the semaphore reaches 0, we detach our backend thread. Otherwise it will run forever.
+    cv.wait(l, []{ return counter == 0; });
+    b.detach();
     return 0;
+    //NOTE: I tried my best to get the print statements to make sense when you run the bash script in this project. However, it still might be a little wacky. The global mutex, semaphore and utilizing the c++ sleep/join functions help a ton!
+    //but it's not perfect xD
+    //If you run my bash script over and over again, everything always comes out in a different order. This is a nice little exercise for learning about multithreading! :)
 }
